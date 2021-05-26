@@ -677,6 +677,42 @@ func disableKprobe(eventName string) error {
 	return nil
 }
 
+func (b *Module) CloseUprobeHandler(name string, path string, offset uint64) error {
+	probe := b.Uprobe(name)
+	if probe == nil {
+		return nil
+	}
+
+	var probeType string
+	if strings.HasPrefix(probe.Name, "uretprobe/") {
+		probeType = "r"
+	} else {
+		probeType = "p"
+	}
+	eventName := fmt.Sprintf("%s__%s_%x_gobpf_%d",
+		probeType, safeEventName(path), offset, os.Getpid())
+
+	if efd, ok := probe.efds[eventName]; ok {
+		if err := syscall.Close(efd); err != nil {
+				return fmt.Errorf("error closing uprobe's event fd: %v", err)
+			}
+			if err := disableUprobe(eventName); err != nil {
+				return fmt.Errorf("error clearing probe: %v", err)
+			}
+
+		// Check if probe has more efds
+		if len(probe.efds) > 1 {
+			delete(probe.efds, eventName)
+			return nil
+		}
+
+		if err := syscall.Close(probe.fd); err != nil {
+			return fmt.Errorf("error closing uprobe fd: %v", err)
+		}
+	}
+	return nil
+}
+
 func disableUprobe(eventName string) error {
 	uprobeEventsFileName := "/sys/kernel/debug/tracing/uprobe_events"
 	f, err := os.OpenFile(uprobeEventsFileName, os.O_APPEND|os.O_WRONLY, 0)
