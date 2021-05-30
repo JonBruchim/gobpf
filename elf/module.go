@@ -498,17 +498,20 @@ func safeEventName(event string) string {
 	return safeEventRegexp.ReplaceAllString(event, "_")
 }
 
-// AttachUprobe attaches the uprobe's BPF script to the program or library
-// at the given path and offset.
-func AttachUprobe(uprobe *Uprobe, path string, offset uint64) error {
+func GetUprobeEventName(uprobe *Uprobe, path string, offset uint64) string {
 	var probeType string
 	if strings.HasPrefix(uprobe.Name, "uretprobe/") {
 		probeType = "r"
 	} else {
 		probeType = "p"
 	}
-	eventName := fmt.Sprintf("%s__%s_%x_gobpf_%d",
+	return fmt.Sprintf("%s__%s_%x_gobpf_%d",
 		probeType, safeEventName(path), offset, os.Getpid())
+}
+// AttachUprobe attaches the uprobe's BPF script to the program or library
+// at the given path and offset.
+func AttachUprobe(uprobe *Uprobe, path string, offset uint64) error {
+	eventName := GetUprobeEventName(uprobe, path, offset)
 
 	if _, ok := uprobe.efds[eventName]; ok {
 		return errors.New("uprobe already attached")
@@ -683,14 +686,7 @@ func (b *Module) CloseUprobeHandler(name string, path string, offset uint64) err
 		return nil
 	}
 
-	var probeType string
-	if strings.HasPrefix(probe.Name, "uretprobe/") {
-		probeType = "r"
-	} else {
-		probeType = "p"
-	}
-	eventName := fmt.Sprintf("%s__%s_%x_gobpf_%d",
-		probeType, safeEventName(path), offset, os.Getpid())
+	eventName := GetUprobeEventName(probe, path, offset)
 
 	if efd, ok := probe.efds[eventName]; ok {
 		if err := syscall.Close(efd); err != nil {
