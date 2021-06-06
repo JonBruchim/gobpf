@@ -356,7 +356,7 @@ func (b *Module) EnableKprobe(secName string, maxactive int) error {
 		probeType = "p"
 		funcName = strings.TrimPrefix(secName, "kprobe/")
 	}
-	eventName := probeType + funcName
+	eventName := fmt.Sprintf("%s%s%d", probeType, funcName, os.Getpid())
 
 	kprobeId, err := writeKprobeEvent(probeType, eventName, funcName, maxactiveStr)
 	// fallback without maxactive
